@@ -1,9 +1,9 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const Userweb = require('../modelos/usuario'); // Ajusta la ruta según tu proyecto
-const Reportes = require('../modelos/reportes'); // Ajusta la ruta según tu proyecto
+const Userweb = require('../modelos/usuario'); 
+const Reportes = require('../modelos/reportes'); 
 const jwt = require('jsonwebtoken');
-const Company = require('../modelos/empresa'); // Asegúrate de que la ruta sea correcta
+const Company = require('../modelos/empresa'); 
 const axios = require('axios');
 const DniScan = require('../modelos/dni');
 const Consulta = require('../modelos/reportes_scan');
@@ -12,28 +12,22 @@ const Sala = require('../modelos/salajuego');
 const authMiddlewareUser = require('../middlewares/authMiddlewareUser');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET;
 
 // Login
 router.post('/login', async (req, res) => {
-  console.log('Solicitud recibida:', req.body);
-
-  const { email, password, usermobile, passwordmobile, androidId } = req.body;
+  const { usermobile, passwordmobile, androidId } = req.body;
 
   try {
-    // Buscar al usuario en la colección Userweb
     const userweb = await Userweb.findOne({ usermobile });
     if (!userweb) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    // Verificar la contraseña
     const isMatch = await bcrypt.compare(passwordmobile, userweb.passwordmobile);
     if (!isMatch) {
       return res.status(400).json({ error: 'Credenciales inválidas' });
     }
 
-    // Validar si la empresa está activa y la fecha no ha expirado
     const company = await Company.findOne({ _id: userweb.company._id });
     if (!company) {
       return res.status(404).json({ error: 'Empresa no encontrada' });
@@ -46,18 +40,15 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ error: 'La fecha de expiración de la empresa ha pasado' });
     }
 
-    // Validar si el `imei` del dispositivo está asociado a uno de los clientes del usuario
-    const clientes = await Cliente.find({ user: userweb._id }); // Obtener todos los clientes del usuario
-    const imeis = clientes.map((cliente) => cliente.imei); // Obtener todos los `imei` asociados
+    const clientes = await Cliente.find({ user: userweb._id }); 
+    const imeis = clientes.map((cliente) => cliente.imei); 
 
     if (!imeis.includes(androidId)) {
       return res.status(403).json({ error: 'El dispositivo no está asociado a este usuario' });
     }
 
-    // Generar el token de autenticación
     const token = jwt.sign({ id: userweb._id, type: 'userweb', user: userweb }, process.env.JWT_SECRET, { expiresIn: '5h' });
 
-    // Responder con éxito
     return res.status(200).json({
       token,
       user: { name: userweb.name, email: userweb.userweb, type: 'userweb' },
@@ -69,25 +60,16 @@ router.post('/login', async (req, res) => {
 });
 
 
-// Login Cliente
 router.post('/login-cliente', async (req, res) => {
-  console.log('Solicitud recibida:', req.body);
-
   const { imei } = req.body;
-
   try {
-    // Buscar al cliente por su imei
     const cliente = await Cliente.findOne({ imei }).populate('sala user');
 
     if (!cliente) {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
-    // Obtener datos relacionados
     const { sala, user } = cliente;
-
-
-    // Verificar si la empresa asociada al usuario está activa
     const company = await Company.findOne({ _id: user.company._id });
     if (!company) {
       return res.status(404).json({ error: 'Empresa no encontrada' });
@@ -97,13 +79,11 @@ router.post('/login-cliente', async (req, res) => {
       return res.status(403).json({ error: 'La empresa está desactivada' });
     }
 
-    // Verificar si la fecha de expiración de la empresa ha pasado
     const today = new Date();
     if (company.fechaFin && company.fechaFin < today) {
       return res.status(403).json({ error: 'La fecha de expiración de la empresa ha pasado' });
     }
 
-    // Generar un token JWT para el cliente
     const token = jwt.sign({ id: cliente._id, imei, type: 'cliente' }, process.env.JWT_SECRET, { expiresIn: '5h' });
 
     return res.status(200).json({
@@ -131,8 +111,7 @@ router.get('/dni/:dni', authMiddlewareUser, async (req, res) => {
         },
       });
   
-      res.json(response.data); // Enviar datos de la API al frontend
-      console.log(response.data)
+      res.json(response.data);
     } catch (error) {
       console.error('Error al consultar la API externa:', error.message);
       res.status(500).json({
@@ -142,10 +121,8 @@ router.get('/dni/:dni', authMiddlewareUser, async (req, res) => {
     }
   });
   
-  // Ruta para guardar datos del DNI en la base de datos
-  router.post('/saveDniData', authMiddlewareUser, async (req, res) => {
+router.post('/saveDniData', authMiddlewareUser, async (req, res) => {
     const { dni, nombre, apellido_paterno, apellido_materno } = req.body;
-  
     try {
       const newReport = new Reportes({
         dni,
@@ -154,7 +131,6 @@ router.get('/dni/:dni', authMiddlewareUser, async (req, res) => {
         apellido_materno,
         date: new Date(),
       });
-  
       await newReport.save();
       res.status(201).json({ message: 'Reporte guardado correctamente.' });
     } catch (error) {
@@ -163,10 +139,10 @@ router.get('/dni/:dni', authMiddlewareUser, async (req, res) => {
     }
   });
   
-  router.get('/getCompany', async (req, res) => {
+router.get('/getCompany', async (req, res) => {
     try {
-      const userId = req.query.id; // Obtén el ID del usuario autenticado
-      const user = await Userweb.findById(userId).select('company'); // Busca al usuario y solo selecciona el campo 'empresa'
+      const userId = req.query.id; 
+      const user = await Userweb.findById(userId).select('company'); 
       if (!user) {
         return res.status(404).json({ message: 'Usuario no encontrado' });
       }
@@ -177,17 +153,14 @@ router.get('/dni/:dni', authMiddlewareUser, async (req, res) => {
     }
   });
 
-  router.post('/barscan', authMiddlewareUser, async (req, res) => {
+router.post('/barscan', authMiddlewareUser, async (req, res) => {
     const { dni, barcodeDni } = req.body;
     
     if (!dni || !barcodeDni) {
       return res.status(400).json({ error: 'DNI y código de barras son necesarios.' });
     }
-  
-    // Verificar si el DNI coincide con el código de barras
     if (dni === barcodeDni) {
       try {
-        // Guardar la entrada en la base de datos
         const scan = new DniScan({ dni, barcodeDni });
         await scan.save();
         return res.status(200).json({ success: true, message: 'DNI y código de barras coinciden.' });
@@ -200,8 +173,8 @@ router.get('/dni/:dni', authMiddlewareUser, async (req, res) => {
     }
   });
 
-  // Save and validate scan
-router.post("/validate", async (req, res) => {
+
+  router.post("/validate", async (req, res) => {
   const { barcode, dni } = req.body;
 
   const match = barcode === dni;
@@ -232,18 +205,13 @@ router.post('/dni/registrarconsulta', authMiddlewareUser, async (req, res) => {
     empresa
   };
 
-
-  // Buscar al cliente en la base de datos usando el androidId (imei)
   const clienteExistente = await Cliente.findOne({ imei: androidId });
 
-  console.log(clienteExistente)
   if (!clienteExistente) {
     return res.status(404).json({ error: 'Cliente no encontrado.' });
   }
 
-  // Obtener la sala correspondiente al cliente
   const salaExistente = await Sala.findOne({ _id: clienteExistente.sala });
-console.log(salaExistente)
   if (!salaExistente) {
     return res.status(404).json({ error: 'Sala no encontrada para el cliente.' });
   }

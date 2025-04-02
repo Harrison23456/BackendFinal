@@ -98,4 +98,30 @@ async function actualizarDatosEnUserweb(company) {
   }
 }
 
-module.exports = mongoose.model('Company', companySchema);
+// Función para verificar y actualizar licencias expiradas
+companySchema.statics.actualizarLicenciasExpiradas = async function() {
+  const ahora = new Date();
+  
+  // Encontrar empresas cuya fechaFin haya pasado y aún estén activas
+  const empresasExpiradas = await this.find({
+    fechaFin: { $lt: ahora },
+    status: true
+  });
+
+  // Actualizar cada empresa expirada
+  for (const empresa of empresasExpiradas) {
+    await this.findByIdAndUpdate(empresa._id, { status: false });
+    
+    // También actualizar en Userweb
+    await actualizarDatosEnUserweb({
+      ...empresa.toObject(),
+      status: false
+    });
+  }
+
+  return empresasExpiradas.length;
+};
+
+const Company = mongoose.model('Company', companySchema);
+
+module.exports = Company;

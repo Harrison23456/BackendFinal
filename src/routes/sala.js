@@ -2,9 +2,15 @@ const express = require('express');
 const router = express.Router();
 const Sala = require('../modelos/salajuego');
 const authMiddlewareUser = require('../middlewares/authMiddlewareUser');
+const authMiddlewareGeneral = require('../middlewares/authMiddlewareGeneral');
 const Userweb = require('../modelos/usuario'); // Asegúrate de que la ruta sea correcta
 const Consulta = require('../modelos/reportes_scan');
+const Comportamiento = require('../modelos/comportamiento');
+const Ludopatas = require('../modelos/ludopatas');
+const Agravios = require('../modelos/agravios');
+
 const authMiddleware = require('../middlewares/authMiddleware');
+const upload = require('../middlewares/uploadMiddleware');
 
 
 router.post('/crear-sala', authMiddlewareUser, async (req, res) => {
@@ -23,8 +29,7 @@ router.post('/crear-sala', authMiddlewareUser, async (req, res) => {
     try {
       const userId = req.user._id;
   
-      // Buscar salas del usuario y poblar datos del usuario
-      const salas = await Sala.find({ user: userId }).populate('user'); // Población con campos específicos
+      const salas = await Sala.find({ user: userId }).populate('user'); 
   
       res.status(200).json(salas);
     } catch (error) {
@@ -112,4 +117,271 @@ router.delete('/mis-salas/:id', authMiddlewareUser, async (req, res) => {
     }
   });
   
+
+router.get('/comportamientos', authMiddlewareUser, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const comportamientos = await Comportamiento.find({ userId });
+    res.json(comportamientos);
+  } catch (error) {
+    res.status(500).json({ message: 'Error obteniendo registros', error });
+  }
+});
+
+router.get('/comportamientosadmin', authMiddlewareGeneral, async (req, res) => {
+  try {
+    const comportamientos = await Comportamiento.find();
+
+    const comportamientosModificados = comportamientos.map(c => ({
+      ...c._doc, 
+      apellidos: `${c.apellidoPaterno} ${c.apellidoMaterno}`.trim() // Combinar apellidos
+    }));
+
+    res.json(comportamientosModificados);
+  } catch (error) {
+    res.status(500).json({ message: 'Error obteniendo registros', error });
+  }
+});
+
+router.patch('/comportamientos/:id/ludopata', authMiddlewareGeneral, async (req, res) => {
+  try {
+    const { ludopata } = req.body;
+    const comportamiento = await Comportamiento.findByIdAndUpdate(
+      req.params.id,
+      { ludopata },
+      { new: true }
+    );
+
+    if (!comportamiento) {
+      return res.status(404).json({ message: 'Registro no encontrado' });
+    }
+
+    res.json(comportamiento);
+  } catch (error) {
+    res.status(500).json({ message: 'Error actualizando el estado de ludopatía', error });
+  }
+});
+
+router.get('/sololudopatas', async (req, res) => {
+  try {
+    const ludopatas = await Comportamiento.find({ ludopata: true })
+      .select('-tipoDeAgravio -descripcion');
+
+    // Combinar apellidoPaterno y apellidoMaterno en un nuevo campo "apellidos"
+    const ludopatasConApellidos = ludopatas.map(ludopata => ({
+      ...ludopata.toObject(),
+      apellidos: `${ludopata.apellidoPaterno} ${ludopata.apellidoMaterno}`
+    }));
+
+    res.json(ludopatasConApellidos);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener ludópatas', error });
+  }
+});
+
+
+router.post('/comportamientos', authMiddlewareGeneral, upload.single('imagen'), async (req, res) => {
+  try {
+    const { nombre, apellidoPaterno, apellidoMaterno, edad, dni, descripcion, tipoDeAgravio, departamento, provincia, distrito, nroRegistro, tipoJugador } = req.body;
+    const userId = req.user._id;
+    
+    const imagen = req.file ? req.file.path : null;
+
+    const nuevoComportamiento = new Comportamiento({
+      userId,
+      nombre,
+      apellidoPaterno,
+      apellidoMaterno,
+      edad,
+      dni,
+      descripcion,
+      tipoDeAgravio,
+      departamento,
+      provincia,
+      distrito,
+      fechaRegistro: new Date(),
+      nroRegistro,
+      tipoJugador,
+      imagen
+    });
+
+    await nuevoComportamiento.save();
+    res.status(201).json({ message: 'Registro creado correctamente', nuevoComportamiento });
+  } catch (error) {
+    res.status(500).json({ message: 'Error creando el registro', error });
+  }
+});
+
+
+
+router.put('/comportamientos/:id', authMiddlewareGeneral, upload.single('imagen'), async (req, res) => {
+  try {
+    const updateData = { ...req.body };
+
+    if (req.file) {
+      updateData.imagen = req.file.path;
+    }
+
+    const comportamientoActualizado = await Comportamiento.findByIdAndUpdate(
+      req.params.id, 
+      updateData, 
+      { new: true }
+    );
+
+    if (!comportamientoActualizado) {
+      return res.status(404).json({ message: 'Registro no encontrado' });
+    }
+
+    res.json(comportamientoActualizado);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.delete('/comportamientos/:id', authMiddlewareGeneral, async (req, res) => {
+  try {
+    const comportamientoEliminado = await Comportamiento.findByIdAndDelete(req.params.id);
+    if (!comportamientoEliminado) {
+      return res.status(404).json({ message: 'Registro no encontrado' });
+    }
+    res.json({ message: 'Registro eliminado correctamente' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+//--------------------------Ludópatas----------------------------------------
+
+router.post('/ludopatas', authMiddleware, async (req, res) => {
+  try {
+    const { nombre, apellidoPaterno, apellidoMaterno, edad, dni, ludopata } = req.body;
+    const userId = req.user.id;
+    const nuevoComportamiento = new Ludopatas({
+      userId,
+      nombre,
+      apellidoPaterno,
+      apellidoMaterno,
+      edad,
+      dni,
+      ludopata
+    });
+
+    await nuevoComportamiento.save();
+    res.status(201).json({ message: 'Registro creado correctamente', nuevoComportamiento });
+  } catch (error) {
+    res.status(500).json({ message: 'Error creando el registro', error });
+  }
+});
+
+router.get('/ludopatas', authMiddlewareGeneral, async (req, res) => {
+  try {
+    const comportamientos = await Ludopatas.find({ });
+    res.json(comportamientos);
+  } catch (error) {
+    res.status(500).json({ message: 'Error obteniendo registros', error });
+  }
+});
+
+router.put('/ludopatas/:id', authMiddleware, async (req, res) => {
+  try {
+      const comportamientoActualizado = await Ludopatas.findByIdAndUpdate(
+          req.params.id, 
+          req.body, 
+          { new: true } 
+      );
+      if (!comportamientoActualizado) {
+          return res.status(404).json({ message: 'Registro no encontrado' });
+      }
+      res.json(comportamientoActualizado);
+  } catch (error) {
+      res.status(400).json({ message: error.message });
+  }
+});
+
+router.delete('/ludopatas/:id', authMiddleware, async (req, res) => {
+  try {
+      const comportamientoEliminado = await Ludopatas.findOneAndDelete(req.params._id);
+      if (!comportamientoEliminado) {
+          return res.status(404).json({ message: 'Registro no encontrado' });
+      }
+      res.json({ message: 'Registro eliminado correctamente' });
+  } catch (error) {
+      res.status(500).json({ message: error.message });
+  }
+});
+
+/* ------------------------------------Agravios------------------------------------------------------- */
+router.post('/agravios', async (req, res) => {
+  try {
+    const nuevoAgravio = new Agravios(req.body);
+    await nuevoAgravio.save();
+    res.status(201).json(nuevoAgravio);
+  } catch (error) {
+    res.status(400).json({ message: 'Error al crear el agravio', error });
+  }
+});
+
+router.get('/agravios', async (req, res) => {
+  try {
+    const agravios = await Agravios.find();
+    res.json(agravios);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener los agravios', error });
+  }
+});
+
+router.get('/agravios/:id', async (req, res) => {
+  try {
+    const agravio = await Agravios.findById(req.params.id);
+    if (!agravio) return res.status(404).json({ message: 'Agravio no encontrado' });
+    res.json(agravio);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al buscar el agravio', error });
+  }
+});
+
+router.put('/agravios/:id', async (req, res) => {
+  try {
+    const agravioActualizado = await Agravios.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!agravioActualizado) return res.status(404).json({ message: 'Agravio no encontrado' });
+    res.json(agravioActualizado);
+  } catch (error) {
+    res.status(400).json({ message: 'Error al actualizar el agravio', error });
+  }
+});
+
+router.delete('/agravios/:id', async (req, res) => {
+  try {
+    const agravioEliminado = await Agravios.findByIdAndDelete(req.params.id);
+    if (!agravioEliminado) return res.status(404).json({ message: 'Agravio no encontrado' });
+    res.json({ message: 'Agravio eliminado correctamente' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar el agravio', error });
+  }
+});
+
+router.get('/sololudopata/:dni', async (req, res) => {
+  try {
+    const { dni } = req.params;
+    const comportamiento = await Comportamiento.findOne({ dni, ludopata: true });
+
+    if (comportamiento) {
+      return res.status(200).json({
+        esLudopata: true,
+        mensaje: 'El usuario está registrado como ludópata.',
+        datos: comportamiento,
+      });
+    } else {
+      return res.status(200).json({
+        esLudopata: false,
+        mensaje: 'El usuario no está registrado como ludópata.',
+      });
+    }
+  } catch (error) {
+    console.error('Error al buscar en la base de datos:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor' });
+  }
+});
+
+
 module.exports = router;

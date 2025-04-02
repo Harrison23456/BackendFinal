@@ -5,10 +5,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../modelos/admin');
 const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware');
-const Userweb = require('../modelos/usuario'); // Asegúrate de que la ruta sea correcta
-const Company = require('../modelos/empresa'); // Asegúrate de que la ruta sea correcta
-
-const JWT_SECRET = process.env.JWT_SECRET;
+const Userweb = require('../modelos/usuario'); 
+const Company = require('../modelos/empresa'); 
 
 router.get('/signin', authMiddleware, (req, res) => {
   if (req.user.type === 'user') {
@@ -32,7 +30,7 @@ router.post('/register', async (req, res) => {
 
 // Login
 router.post('/login', async (req, res) => {
-  const { email, password, userweb, passwordweb } = req.body;
+  const { email, password } = req.body;
 
   try {
     // Buscar en la colección User
