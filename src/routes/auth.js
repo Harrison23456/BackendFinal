@@ -81,7 +81,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Si no se encuentra en ninguna colección
     return res.status(404).json({ error: 'User not found' });
 
   } catch (error) {

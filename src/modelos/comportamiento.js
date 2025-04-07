@@ -20,7 +20,7 @@ const comportamientoSchema = new mongoose.Schema({
   fechaRegistro: { type: Date, default: Date.now },
   imagen: { type: String }, 
   nroRegistro: { type: Number, required: true, default: 0 }, 
-  tipoJugador: { type: String, required: true, default: 'No especificado' }
+  tipoJugador: { type: String, required: true, default: 'No especificado' },
 });
 
 module.exports = mongoose.model('Comportamiento', comportamientoSchema);

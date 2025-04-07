@@ -5,10 +5,9 @@ const salaSchema = new mongoose.Schema({
   id: { type: String, unique: true },
   name: { type: String, required: true },
   address: { type: String, required: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'Userweb', required: true },  // Referencia al usuario
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'Userweb', required: true },  
 }, { timestamps: true });
 
-// Middleware para autoincrementar el ID
 salaSchema.pre('save', async function (next) {
 
   try {
@@ -19,7 +18,7 @@ salaSchema.pre('save', async function (next) {
       { new: true, upsert: true }
     );
 
-    this.id = counter.sequenceValue.toString().padStart(6, '0'); // 000001, 000002, etc.
+    this.id = counter.sequenceValue.toString().padStart(6, '0');
 
     next();
   } catch (error) {

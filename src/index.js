@@ -2,13 +2,12 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const fs = require('fs'); // Para leer los archivos del certificado
-const https = require('https'); // Importa el módulo HTTPS
+const fs = require('fs'); 
+const https = require('https'); 
 const path = require("path");
 
 require('./database');
 require('dotenv').config();
-require('./databasePostgres'); // Conexión a PostgreSQL
 
 const app = express();
 app.use(express.json());
@@ -19,10 +18,9 @@ app.options('*', (req, res) => {
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, authorization'); // Agregar Authorization
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE, PATCH');
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200); // Responder con un 200 OK para las solicitudes OPTIONS
+  res.sendStatus(200); 
 });
 
-// Middleware adicional (opcional, para control de caché y CORS dinámico)
 app.use((req, res, next) => {
   res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   res.header('Expires', '-1');

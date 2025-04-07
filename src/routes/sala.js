@@ -8,6 +8,8 @@ const Consulta = require('../modelos/reportes_scan');
 const Comportamiento = require('../modelos/comportamiento');
 const Ludopatas = require('../modelos/ludopatas');
 const Agravios = require('../modelos/agravios');
+const jwt = require('jsonwebtoken');  // Para decodificar el token
+const mongoose = require('mongoose');
 
 const authMiddleware = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -375,6 +377,64 @@ router.get('/sololudopata/:dni', async (req, res) => {
       return res.status(200).json({
         esLudopata: false,
         mensaje: 'El usuario no está registrado como ludópata.',
+      });
+    }
+  } catch (error) {
+    console.error('Error al buscar en la base de datos:', error);
+    res.status(500).json({ mensaje: 'Error interno del servidor' });
+  }
+});
+
+const verificarToken = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1];
+  if (!token) return res.status(401).json({ mensaje: 'Token no proporcionado' });
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ mensaje: 'Token no válido' });
+    req.user = decoded;  // Guarda el usuario decodificado para el siguiente middleware
+    next();
+  });
+};
+
+router.get('/soloagravio/:dni', async (req, res) => {
+  try {
+    const { dni } = req.params;
+
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ mensaje: 'Token no proporcionado' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const companyId = decoded.user?.company?._id;
+    if (!companyId) {
+      return res.status(403).json({ mensaje: 'No se pudo obtener la empresa del usuario' });
+    }
+    const companyObjectId = new mongoose.Types.ObjectId(companyId);
+
+    const usuariosEmpresa = await Userweb.find({ 'company._id': companyObjectId });
+    if (!usuariosEmpresa.length) {
+      return res.status(404).json({ mensaje: 'No se encontraron usuarios en la empresa' });
+    }
+
+    const usuariosIds = usuariosEmpresa.map(user => user._id);
+
+    const comportamiento = await Comportamiento.findOne({
+      dni,
+      userId: { $in: usuariosIds },
+      tipoDeAgravio: { $ne: 'Ninguno' } 
+    });
+
+    if (comportamiento) {
+      return res.status(200).json({
+        tieneAgravio: true,
+        mensaje: 'El usuario tiene un tipo de agravio registrado en su empresa.',
+        datos: comportamiento,
+      });
+    } else {
+      return res.status(200).json({
+        tieneAgravio: false,
+        mensaje: 'El usuario no tiene un tipo de agravio registrado en su empresa.',
       });
     }
   } catch (error) {
